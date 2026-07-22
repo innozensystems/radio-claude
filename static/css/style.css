@@ -1,0 +1,371 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #f7f7f7;
+  --header-bg: #4a4a4a;
+  --text: #333;
+  --muted: #777;
+  --accent: #7fe7c6;
+  --accent-dark: #5cd6ae;
+  --history-bg: #e6f9f1;
+  --player-bg: #3a3a3a;
+  --player-text: #fff;
+  --danger: #ff6b6b;
+  --success: #4ade80;
+}
+
+body {
+  margin: 0;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.site-header {
+  width: 100%;
+  height: 76px;
+  background: var(--header-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.logo-radio {
+  color: #fff;
+}
+
+.logo-claude {
+  color: var(--accent);
+}
+
+.logo-mascot {
+  width: 36px;
+  height: 36px;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+}
+
+.top-section {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+  margin-bottom: 2.5rem;
+}
+
+.album-art {
+  flex: 1 1 58%;
+  max-width: 520px;
+}
+
+.np-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #e5e5e5;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.now-playing {
+  flex: 1 1 40%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-top: 0.5rem;
+}
+
+.current-track {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.track-artist {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.track-title {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.track-meta {
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 500;
+  min-height: 1.5em;
+}
+
+.track-quality {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #999;
+  font-style: italic;
+}
+
+.quality-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.quality-label {
+  font-weight: 500;
+}
+
+.quality-value {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.rating-label {
+  font-size: 0.95rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.rating-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.rate-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.rate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.rate-btn.active-up {
+  background: #e6f9f1;
+  border-color: var(--success);
+}
+
+.rate-btn.active-down {
+  background: #ffeaea;
+  border-color: var(--danger);
+}
+
+.rate-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.rating-msg {
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--player-bg);
+  color: var(--player-text);
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  width: fit-content;
+  max-width: 100%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.play-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #333;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.play-btn:hover {
+  background: var(--accent-dark);
+  transform: scale(1.05);
+}
+
+.play-btn.playing {
+  background: var(--danger);
+  color: #fff;
+}
+
+.player-time {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.mute-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--player-text);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.volume-slider {
+  width: 100px;
+  accent-color: var(--accent);
+}
+
+.history-card {
+  background: var(--history-bg);
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+}
+
+.history-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.history-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.history-list li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.history-list .hist-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.history-list .hist-artist {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.history-list .empty {
+  text-align: center;
+  color: var(--muted);
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+#audio-player {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .top-section {
+    flex-direction: column;
+  }
+
+  .album-art {
+    max-width: 100%;
+  }
+
+  .now-playing {
+    width: 100%;
+  }
+}

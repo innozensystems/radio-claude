@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Radio Claude</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="logo">
+        <span class="logo-radio">Radio</span>
+        <img
+          class="logo-mascot"
+          src="/static/img/mascot.svg"
+          alt=""
+          width="36"
+          height="36"
+        />
+        <span class="logo-claude">Claude</span>
+      </div>
+    </header>
+
+    <main class="app">
+      <section class="top-section">
+        <div class="album-art">
+          <img
+            id="np-cover"
+            class="np-cover"
+            src="/static/img/default-cover.svg"
+            alt="Album cover"
+          />
+        </div>
+
+        <div class="now-playing">
+          <div class="current-track">
+            <div class="track-artist" id="np-artist">Waiting for metadata…</div>
+            <div class="track-title" id="np-title">—</div>
+            <div class="track-meta" id="np-album"></div>
+            <div class="track-quality">
+              <div class="quality-row">
+                <span class="quality-label">Source quality:</span>
+                <span class="quality-value" id="source-quality">—</span>
+              </div>
+              <div class="quality-row">
+                <span class="quality-label">Stream quality:</span>
+                <span class="quality-value">48kHz FLAC / HLS Lossless</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rating">
+            <span class="rating-label">Rate this track:</span>
+            <div class="rating-buttons" id="rating-buttons">
+              <button id="rate-up" class="rate-btn rate-up" type="button" aria-label="Thumbs up">
+                👍
+                <span class="rate-count" id="rate-up-count">0</span>
+              </button>
+              <button id="rate-down" class="rate-btn rate-down" type="button" aria-label="Thumbs down">
+                👎
+                <span class="rate-count" id="rate-down-count">0</span>
+              </button>
+            </div>
+            <div class="rating-msg" id="rating-msg"></div>
+          </div>
+
+          <div class="player-bar">
+            <button id="play-btn" class="play-btn" type="button" aria-label="Play">▶</button>
+            <div class="player-time" id="track-timer">0:00</div>
+            <div class="live-badge"><span class="live-dot"></span> Live</div>
+            <button id="mute-btn" class="mute-btn" type="button" aria-label="Mute">🔊</button>
+            <input
+              id="volume-slider"
+              class="volume-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value="1"
+              aria-label="Volume"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="history-card">
+        <h2>Previous tracks:</h2>
+        <ul id="history-list" class="history-list">
+          <li class="empty">Loading history…</li>
+        </ul>
+      </section>
+
+      <audio id="audio-player"></audio>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="/static/js/player.js"></script>
+  </body>
+</html>
