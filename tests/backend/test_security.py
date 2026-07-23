@@ -1,6 +1,8 @@
 from http.cookies import SimpleCookie
 
-from app import VOTER_COOKIE, app, voter_serializer
+import pytest
+
+from app import VOTER_COOKIE, app, configured_url, voter_serializer
 
 
 def extract_cookie(response, name):
@@ -56,6 +58,31 @@ def test_security_headers_are_present(client):
     assert "frame-ancestors 'none'" in csp
     assert "'unsafe-eval'" not in csp
     assert "'unsafe-inline'" not in csp
+
+
+def test_media_configuration_is_rendered_and_allowed_by_csp(client):
+    response = client.get("/")
+    body = response.get_data(as_text=True)
+    csp = response.headers["Content-Security-Policy"]
+
+    assert 'data-stream-url="https://stream.example.com/live.m3u8"' in body
+    assert (
+        'data-hls-fallback-url="https://stream.example.com/compatible.m3u8"'
+        in body
+    )
+    assert 'data-metadata-url="https://stream.example.com/metadata.json"' in body
+    assert 'data-cover-url="https://stream.example.com/cover.jpg"' in body
+    assert "https://stream.example.com" in csp
+
+
+def test_configured_url_rejects_missing_and_non_http_values(monkeypatch):
+    monkeypatch.delenv("TEST_MEDIA_URL", raising=False)
+    with pytest.raises(RuntimeError, match="must be configured"):
+        configured_url("TEST_MEDIA_URL")
+
+    monkeypatch.setenv("TEST_MEDIA_URL", "file:///tmp/media.m3u8")
+    with pytest.raises(RuntimeError, match=r"absolute HTTP\(S\) URL"):
+        configured_url("TEST_MEDIA_URL")
 
 
 def test_oversized_request_is_rejected(client):

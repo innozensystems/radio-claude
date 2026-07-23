@@ -27,7 +27,14 @@
       </div>
     </header>
 
-    <main class="app">
+    <main
+      id="radio-app"
+      class="app"
+      data-stream-url="{{ stream_url }}"
+      data-hls-fallback-url="{{ hls_fallback_url }}"
+      data-metadata-url="{{ metadata_url }}"
+      data-cover-url="{{ cover_url }}"
+    >
       <section class="top-section">
         <div class="album-art">
           <img

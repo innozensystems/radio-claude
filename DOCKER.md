@@ -4,12 +4,17 @@ This project includes Docker configurations for both development and production 
 
 ## Quick Start
 
+Copy `.env.example` to `.env` and replace its placeholder URLs with authorized
+stream, metadata, and artwork sources before starting either environment.
+Docker Compose loads `.env` automatically. These runtime values are not baked
+into the image.
+
 ### Development Container
 
 Run with hot-reload and Flask debug mode:
 
 ```bash
-docker run -it -p 5000:5000 radioclaude:dev
+docker run -it --env-file .env -p 5000:5000 radioclaude:dev
 ```
 
 Or with docker-compose:
@@ -95,6 +100,7 @@ docker run -it --rm \
   -p 5000:5000 \
   -v $(pwd):/app \
   -v /app/__pycache__ \
+  --env-file .env \
   -e FLASK_ENV=development \
   radioclaude:dev
 ```
@@ -109,6 +115,7 @@ PostgreSQL and Nginx services.
 - `docker/nginx.conf` — Nginx reverse-proxy configuration
 - `docker/start-prod.sh` — initializes PostgreSQL and starts Gunicorn
 - `.dockerignore` — excludes unnecessary files from build context
+- `.env.example` — safe placeholders for required runtime media endpoints
 
 ## Notes
 
@@ -117,3 +124,7 @@ PostgreSQL and Nginx services.
 - Both share the same base layer to minimize total image size
 - PostgreSQL and uploaded audio persist across production container restarts
 - Development and automated tests continue to use SQLite
+- `STREAM_URL`, `METADATA_URL`, and `COVER_URL` are required at runtime;
+  `HLS_FALLBACK_URL` may be omitted to reuse `STREAM_URL`
+- Never put real stream URLs in a Dockerfile, build argument, Compose file,
+  public command example, or published image layer

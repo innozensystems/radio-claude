@@ -4,6 +4,7 @@ import os
 import secrets
 import sqlite3
 import uuid
+from urllib.parse import urlsplit
 
 from flask import Flask, g, jsonify, render_template, request, send_from_directory
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -20,19 +21,56 @@ app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB
 app.config["DATABASE"] = os.environ.get("DATABASE_URL", DATABASE)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 
+
+def configured_url(name, default=None):
+    value = os.environ.get(name) or default
+    if not value:
+        raise RuntimeError(f"{name} must be configured")
+
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise RuntimeError(f"{name} must be an absolute HTTP(S) URL")
+    return value
+
+
+def url_origin(url):
+    parsed = urlsplit(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+app.config["STREAM_URL"] = configured_url("STREAM_URL")
+app.config["HLS_FALLBACK_URL"] = configured_url(
+    "HLS_FALLBACK_URL", app.config["STREAM_URL"]
+)
+app.config["METADATA_URL"] = configured_url("METADATA_URL")
+app.config["COVER_URL"] = configured_url("COVER_URL")
+
 VOTER_COOKIE = "radio_voter"
 VOTER_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 
 
 @app.after_request
 def set_csp_header(response):
+    stream_origins = sorted(
+        {
+            url_origin(app.config["STREAM_URL"]),
+            url_origin(app.config["HLS_FALLBACK_URL"]),
+        }
+    )
+    metadata_origin = url_origin(app.config["METADATA_URL"])
+    cover_origin = url_origin(app.config["COVER_URL"])
+    connect_sources = " ".join(
+        sorted({"'self'", metadata_origin, *stream_origins})
+    )
+    media_sources = " ".join([*stream_origins, "blob:"])
+
     response.headers["Content-Security-Policy"] = (
         "script-src 'self' https://cdn.jsdelivr.net; "
         "style-src 'self' https://fonts.googleapis.com; "
-        "connect-src 'self' https://d3d4yli4hf5bmh.cloudfront.net; "
-        "media-src https://d3d4yli4hf5bmh.cloudfront.net blob:; "
+        f"connect-src {connect_sources}; "
+        f"media-src {media_sources}; "
         "worker-src blob:; "
-        "img-src 'self' https://d3d4yli4hf5bmh.cloudfront.net https://fonts.gstatic.com; "
+        f"img-src 'self' {cover_origin} https://fonts.gstatic.com; "
         "font-src https://fonts.gstatic.com; "
         "object-src 'none'; "
         "base-uri 'self'; "
@@ -154,7 +192,13 @@ def init_db(db_path=None):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        stream_url=app.config["STREAM_URL"],
+        hls_fallback_url=app.config["HLS_FALLBACK_URL"],
+        metadata_url=app.config["METADATA_URL"],
+        cover_url=app.config["COVER_URL"],
+    )
 
 
 @app.route("/tracks", methods=["GET"])

@@ -1,24 +1,21 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const HLS_URL = "https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8";
-  // Chromium uses hls.js/Media Source instead of native HLS. Point that path
-  // at the AAC rendition explicitly: the master playlist also advertises a
-  // FLAC/fMP4 rendition which Chromium may select even though it cannot
-  // reliably append those segments through Media Source.
-  const HLS_JS_URL =
-    "https://d3d4yli4hf5bmh.cloudfront.net/hls/aac_hifi.m3u8";
+  const radioApp = document.getElementById("radio-app");
+  const HLS_URL = radioApp.dataset.streamUrl;
+  // Chromium uses hls.js/Media Source instead of native HLS. Operators can
+  // provide a separate browser-compatible rendition when the primary stream
+  // contains codecs that Media Source cannot append reliably.
+  const HLS_JS_URL = radioApp.dataset.hlsFallbackUrl;
   const HLS_LIBRARY_URL =
     "https://cdn.jsdelivr.net/npm/hls.js@1.6.16/dist/hls.min.js";
   const HLS_LIBRARY_INTEGRITY =
     "sha384-5E8B0pTlZZJMabWpC0fyYf6OUpe15jJij34BqBAh4NXoHAlLNOjCPRrwtOXOQFAn";
-  const METADATA_URL = "https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json";
-  const COVER_URL = "https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg";
+  const METADATA_URL = radioApp.dataset.metadataUrl;
+  const COVER_URL = radioApp.dataset.coverUrl;
   const METADATA_POLL_MS = 5000;
   const RATE_STATUS_URL = "/rate-status";
   const RATE_URL = "/rate";
-  // Stream quality depends on the browser playback path, not the source
-  // track's own bit depth/sample rate.
-  const NATIVE_STREAM_QUALITY = "48kHz FLAC / HLS Lossless";
-  const HLS_JS_STREAM_QUALITY = "AAC / HLS";
+  const NATIVE_STREAM_QUALITY = "Native HLS";
+  const HLS_JS_STREAM_QUALITY = "HLS";
 
   const audioPlayer = document.getElementById("audio-player");
   const playBtn = document.getElementById("play-btn");

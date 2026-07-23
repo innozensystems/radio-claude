@@ -1,4 +1,13 @@
+import os
+
 import pytest
+
+os.environ.setdefault("STREAM_URL", "https://stream.example.com/live.m3u8")
+os.environ.setdefault(
+    "HLS_FALLBACK_URL", "https://stream.example.com/compatible.m3u8"
+)
+os.environ.setdefault("METADATA_URL", "https://stream.example.com/metadata.json")
+os.environ.setdefault("COVER_URL", "https://stream.example.com/cover.jpg")
 
 from app import app as flask_app
 from app import init_db

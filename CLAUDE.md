@@ -12,6 +12,9 @@ Run the app (also initializes the SQLite database):
 
 ```bash
 source .venv/bin/activate
+set -a
+source .env
+set +a
 python3 app.py
 ```
 
@@ -58,15 +61,20 @@ There is no frontend test suite, lint config, or formatter configured. Frontend 
 
 ### Frontend behavior
 
-- Loads the live HLS stream at `https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8`.
-- Uses native HLS where reliable and a pinned AAC `hls.js` path in Chromium.
-- Polls `https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json` every 3 seconds to update the now-playing display and a five-track history list.
+- Reads `STREAM_URL`, `HLS_FALLBACK_URL`, `METADATA_URL`, and `COVER_URL`
+  from the runtime environment; no provider endpoints belong in source.
+- Uses native HLS where reliable and the configured fallback HLS rendition
+  with a pinned `hls.js` version in Chromium.
+- Polls the configured metadata endpoint every 5 seconds during active
+  playback to update the now-playing display and five-track history.
 - Displays a track timer that resets whenever the polled metadata changes.
 - Ratings use a signed, HttpOnly voter cookie issued by the server.
 
 ## Development notes
 
-- The `.gitignore` excludes `data/`, `uploads/`, `.venv/`, `__pycache__/`, `.env`, and `.env.local`.
+- Copy `.env.example` to `.env` and use only stream sources the operator is
+  authorized to embed. Never commit real endpoints, signed URLs, or media.
+- The `.gitignore` excludes local `.env.*` files but retains `.env.example`.
 - `app.config["MAX_CONTENT_LENGTH"]` is set to 32 MB for uploads.
 - Flask debug mode is enabled only when `FLASK_DEBUG=1`.
 - `RadioClaude_Style_Guide.txt` documents brand colors, typography, and UI patterns, but the current CSS does not fully follow it.

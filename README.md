@@ -2,6 +2,9 @@
 
 A single-page Flask app that plays a live HLS audio stream in the browser and lets listeners rate tracks. No build step — just vanilla JavaScript, HTML, and CSS.
 
+This repository does not include a live stream, metadata feed, or artwork
+endpoint. Configure only sources that you own or have permission to use.
+
 ## Features
 
 - **Live HLS stream playback** with native support or an `hls.js` fallback
@@ -30,14 +33,59 @@ A single-page Flask app that plays a live HLS audio stream in the browser and le
    python3 -m pip install -r requirements.txt
    ```
 
-2. Start the server (this also initializes the SQLite database):
+2. Copy the environment template and replace every example URL with an
+   authorized source:
+
+   ```bash
+   cp .env.example .env
+   set -a
+   source .env
+   set +a
+   ```
+
+3. Start the server (this also initializes the SQLite database):
 
    ```bash
    source .venv/bin/activate
    python3 app.py
    ```
 
-3. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+4. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+
+## Stream configuration
+
+The application requires these runtime environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `STREAM_URL` | Primary HLS stream used by browsers with reliable native HLS |
+| `HLS_FALLBACK_URL` | Browser-compatible HLS rendition used by `hls.js`; defaults to `STREAM_URL` when omitted |
+| `METADATA_URL` | JSON now-playing metadata and track-history endpoint |
+| `COVER_URL` | Current cover-art image endpoint |
+
+All values must be absolute `http://` or `https://` URLs. The application
+refuses to start when required configuration is missing or malformed. The
+configured origins are added to Content Security Policy at runtime.
+
+The checked-in `.env.example` contains placeholders only. `.env` and other
+`.env.*` files are ignored so real endpoints are not copied into Git history.
+Do not pass these values as Docker build arguments or bake them into an image.
+The Docker build context excludes every `.env*` file.
+
+Because playback happens directly in the browser, configured URLs are visible
+to visitors in the rendered page and network inspector. Runtime configuration
+keeps them out of the repository and image; it does not make them secret. Do
+not use direct browser playback for a URL that must remain confidential.
+
+Publicly accessible does not necessarily mean licensed for redistribution.
+Prefer direct client-side playback from an authorized provider. Do not proxy,
+record, rebroadcast, or publish signed/private URLs unless the provider
+explicitly permits it.
+
+Removing an endpoint from the current files does not remove it from earlier Git
+commits, forks, or already-published container layers. If a previously committed
+URL was sensitive, ask the provider to rotate it and handle repository-history
+or registry cleanup as a separate, coordinated operation.
 
 ## Docker Compose
 
@@ -113,6 +161,7 @@ To run the production application image locally without Nginx or PostgreSQL:
 ```bash
 docker run --rm \
   -p 127.0.0.1:5001:5000 \
+  --env-file .env \
   ghcr.io/innozensystems/radio-claude:latest
 ```
 
@@ -136,6 +185,8 @@ docker tag \
   radioclaude-radioclaude-prod:latest
 
 export POSTGRES_PASSWORD='a-strong-password'
+
+# Docker Compose reads the authorized stream settings from .env.
 
 # Use the pulled image instead of rebuilding it locally.
 docker compose --profile prod up -d --no-build nginx
@@ -221,9 +272,12 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
 
 ## Frontend behavior
 
-- Loads the live HLS stream at `https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8`.
-- Uses native HLS where reliable and an AAC `hls.js` path in Chromium.
-- Polls `https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json` every 5 seconds to update the now-playing display and a five-track history list.
+- Loads the runtime-configured `STREAM_URL`.
+- Uses native HLS where reliable and the runtime-configured
+  `HLS_FALLBACK_URL` with `hls.js` in Chromium.
+- Polls the runtime-configured `METADATA_URL` every 5 seconds during active
+  playback to update the now-playing display and five-track history.
+- Loads current artwork from the runtime-configured `COVER_URL`.
 - Displays a track timer that resets whenever the polled metadata changes.
 - Ratings use a signed, HttpOnly voter cookie issued by the server.
 
@@ -231,7 +285,10 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
 
 - The SQLite database and `uploads/` directory are created automatically on first run.
 - Setting `DATABASE_URL` to a PostgreSQL URL switches the application to PostgreSQL.
+- Stream, metadata, and cover endpoints are runtime configuration and are
+  intentionally absent from the source and container image.
 - `app.config["MAX_CONTENT_LENGTH"]` is set to 32 MB for uploads.
 - Flask debug mode is enabled only when `FLASK_DEBUG=1`.
-- The `.gitignore` excludes `data/`, `uploads/`, `.venv/`, `__pycache__/`, `.env`, and `.env.local`.
+- The `.gitignore` excludes `data/`, `uploads/`, `.venv/`, `__pycache__/`, and
+  local `.env.*` files while retaining `.env.example`.
 - `RadioClaude_Style_Guide.txt` documents the brand palette and UI patterns.
