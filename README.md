@@ -38,12 +38,28 @@ A single-page Flask app that plays a live HLS audio stream in the browser and le
 
 3. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
+## Testing
+
+Backend routes are covered by a pytest suite in `tests/backend/`. Each test runs against an isolated temp SQLite database, not `data/app.db`.
+
+```bash
+source .venv/bin/activate
+python3 -m pip install -r requirements-dev.txt
+python3 -m pytest
+```
+
+There's no frontend test suite — it was scoped (Playwright e2e against mocked HLS/metadata endpoints) but skipped as not worth the added toolchain for this project's size.
+
 ## Project structure
 
 ```
 .
 ├── app.py                 # Flask app: routes, database, upload handling
 ├── requirements.txt       # Python dependencies
+├── requirements-dev.txt   # Dev/test dependencies (pytest)
+├── pytest.ini             # pytest config
+├── tests/
+│   └── backend/           # pytest suite for Flask routes
 ├── data/                  # SQLite database (created at runtime)
 ├── uploads/               # Uploaded audio files (created at runtime)
 ├── templates/
