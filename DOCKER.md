@@ -4,23 +4,32 @@ This project includes Docker configurations for both development and production 
 
 ## Quick Start
 
-Copy `.env.example` to `.env` and replace its placeholder URLs with authorized
-stream, metadata, and artwork sources before starting either environment.
-Docker Compose loads `.env` automatically. These runtime values are not baked
-into the image.
+Pass authorized stream, metadata, and artwork URLs as environment variables
+when starting either environment. These runtime values are not baked into the
+image.
 
 ### Development Container
 
 Run with hot-reload and Flask debug mode:
 
 ```bash
-docker run -it --env-file .env -p 5000:5000 radioclaude:dev
+docker run -it \
+  -p 5000:5000 \
+  -e STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+  -e HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+  -e METADATA_URL='https://authorized-host.example/path/metadata.json' \
+  -e COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  radioclaude:dev
 ```
 
 Or with docker-compose:
 
 ```bash
-docker compose up
+STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+METADATA_URL='https://authorized-host.example/path/metadata.json' \
+COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  docker compose up
 ```
 
 Access the app at `http://localhost:5001`.
@@ -38,8 +47,12 @@ application, and PostgreSQL for persistent relational data. Set a strong
 database password before starting the stack:
 
 ```bash
-export POSTGRES_PASSWORD='replace-with-a-strong-password'
-docker compose --profile prod up --build nginx
+export POSTGRES_PASSWORD='a-strong-password'
+STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+METADATA_URL='https://authorized-host.example/path/metadata.json' \
+COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  docker compose --profile prod up --build nginx
 ```
 
 If `SECRET_KEY` is not provided, the application generates one on first
@@ -100,7 +113,10 @@ docker run -it --rm \
   -p 5000:5000 \
   -v $(pwd):/app \
   -v /app/__pycache__ \
-  --env-file .env \
+  -e STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+  -e HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+  -e METADATA_URL='https://authorized-host.example/path/metadata.json' \
+  -e COVER_URL='https://authorized-host.example/path/cover.jpg' \
   -e FLASK_ENV=development \
   radioclaude:dev
 ```
@@ -115,7 +131,6 @@ PostgreSQL and Nginx services.
 - `docker/nginx.conf` — Nginx reverse-proxy configuration
 - `docker/start-prod.sh` — initializes PostgreSQL and starts Gunicorn
 - `.dockerignore` — excludes unnecessary files from build context
-- `.env.example` — safe placeholders for required runtime media endpoints
 
 ## Notes
 

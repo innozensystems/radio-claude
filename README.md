@@ -5,6 +5,11 @@ A single-page Flask app that plays a live HLS audio stream in the browser and le
 This repository does not include a live stream, metadata feed, or artwork
 endpoint. Configure only sources that you own or have permission to use.
 
+> [!IMPORTANT]
+> The service will not start until external media URLs are configured.
+> Pass authorized endpoint URLs as environment variables when starting the
+> local process, Docker Compose stack, or GHCR image.
+
 ## Features
 
 - **Live HLS stream playback** with native support or an `hls.js` fallback
@@ -33,44 +38,43 @@ endpoint. Configure only sources that you own or have permission to use.
    python3 -m pip install -r requirements.txt
    ```
 
-2. Copy the environment template and replace every example URL with an
-   authorized source:
-
-   ```bash
-   cp .env.example .env
-   set -a
-   source .env
-   set +a
-   ```
-
-3. Start the server (this also initializes the SQLite database):
+2. Start the server with authorized external service URLs (this also
+   initializes the SQLite database):
 
    ```bash
    source .venv/bin/activate
-   python3 app.py
+   STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+   HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+   METADATA_URL='https://authorized-host.example/path/metadata.json' \
+   COVER_URL='https://authorized-host.example/path/cover.jpg' \
+     python3 app.py
    ```
 
-4. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+3. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
 ## Stream configuration
 
-The application requires these runtime environment variables:
+The application uses these runtime environment variables:
 
-| Variable | Purpose |
-|---|---|
-| `STREAM_URL` | Primary HLS stream used by browsers with reliable native HLS |
-| `HLS_FALLBACK_URL` | Browser-compatible HLS rendition used by `hls.js`; defaults to `STREAM_URL` when omitted |
-| `METADATA_URL` | JSON now-playing metadata and track-history endpoint |
-| `COVER_URL` | Current cover-art image endpoint |
+| Variable | Required | Purpose |
+|---|---|---|
+| `STREAM_URL` | Yes | Primary HLS stream used by browsers with reliable native HLS |
+| `HLS_FALLBACK_URL` | No | Browser-compatible HLS rendition used by `hls.js`; defaults to `STREAM_URL` when omitted |
+| `METADATA_URL` | Yes | JSON now-playing metadata and track-history endpoint |
+| `COVER_URL` | Yes | Current cover-art image endpoint |
 
-All values must be absolute `http://` or `https://` URLs. The application
-refuses to start when required configuration is missing or malformed. The
-configured origins are added to Content Security Policy at runtime.
+Every supplied value must be an absolute `http://` or `https://` URL. The
+application refuses to start when required configuration is missing or any
+configured URL is malformed. The configured origins are added to Content
+Security Policy at runtime.
 
-The checked-in `.env.example` contains placeholders only. `.env` and other
-`.env.*` files are ignored so real endpoints are not copied into Git history.
-Do not pass these values as Docker build arguments or bake them into an image.
-The Docker build context excludes every `.env*` file.
+Set `HLS_FALLBACK_URL` as well when Chromium needs a different
+browser-compatible rendition. Otherwise, omit it and the application will use
+`STREAM_URL`.
+
+Pass these values only at runtime. Do not put real endpoints in tracked files,
+Docker build arguments, or image layers. The Docker build context excludes
+every `.env*` file as an additional safeguard.
 
 Because playback happens directly in the browser, configured URLs are visible
 to visitors in the rendered page and network inspector. Runtime configuration
@@ -96,8 +100,14 @@ with the Compose plugin before continuing.
 Build and start the development container:
 
 ```bash
-docker compose up --build
+STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+METADATA_URL='https://authorized-host.example/path/metadata.json' \
+COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  docker compose up --build
 ```
+
+Docker Compose passes these runtime values into the application container.
 
 Open [http://localhost:5001](http://localhost:5001). The project directory is
 mounted into the container, so local code changes trigger Flask's development
@@ -119,8 +129,12 @@ Production runs Nginx in front of Gunicorn and uses PostgreSQL. Set a database
 password, then start the Nginx service and its dependencies:
 
 ```bash
-export POSTGRES_PASSWORD='replace-with-a-strong-password'
-docker compose --profile prod up --build nginx
+export POSTGRES_PASSWORD='a-strong-password'
+STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+METADATA_URL='https://authorized-host.example/path/metadata.json' \
+COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  docker compose --profile prod up --build nginx
 ```
 
 The first production startup generates a signing key in the persistent
@@ -161,7 +175,10 @@ To run the production application image locally without Nginx or PostgreSQL:
 ```bash
 docker run --rm \
   -p 127.0.0.1:5001:5000 \
-  --env-file .env \
+  -e STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+  -e HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+  -e METADATA_URL='https://authorized-host.example/path/metadata.json' \
+  -e COVER_URL='https://authorized-host.example/path/cover.jpg' \
   ghcr.io/innozensystems/radio-claude:latest
 ```
 
@@ -186,10 +203,12 @@ docker tag \
 
 export POSTGRES_PASSWORD='a-strong-password'
 
-# Docker Compose reads the authorized stream settings from .env.
-
 # Use the pulled image instead of rebuilding it locally.
-docker compose --profile prod up -d --no-build nginx
+STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+METADATA_URL='https://authorized-host.example/path/metadata.json' \
+COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  docker compose --profile prod up -d --no-build nginx
 ```
 
 Open [http://localhost:5001](http://localhost:5001). Confirm that PostgreSQL,
@@ -290,5 +309,5 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
 - `app.config["MAX_CONTENT_LENGTH"]` is set to 32 MB for uploads.
 - Flask debug mode is enabled only when `FLASK_DEBUG=1`.
 - The `.gitignore` excludes `data/`, `uploads/`, `.venv/`, `__pycache__/`, and
-  local `.env.*` files while retaining `.env.example`.
+  local `.env*` files.
 - `RadioClaude_Style_Guide.txt` documents the brand palette and UI patterns.
