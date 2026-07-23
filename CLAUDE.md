@@ -66,8 +66,9 @@ There is no frontend test suite, lint config, or formatter configured. Frontend 
   from the runtime environment; no provider endpoints belong in source.
 - Uses native HLS where reliable and the configured fallback HLS rendition
   with a pinned `hls.js` version in Chromium.
-- Polls the configured metadata endpoint every 5 seconds during active
-  playback to update the now-playing display and five-track history.
+- Polls the configured metadata endpoint every 5 seconds while the page is
+  visible, including before playback and while audio is paused, to update the
+  now-playing display and five-track history.
 - Displays a track timer that resets whenever the polled metadata changes.
 - Ratings use a signed, HttpOnly voter cookie issued by the server.
 

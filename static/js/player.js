@@ -14,8 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const METADATA_POLL_MS = 5000;
   const RATE_STATUS_URL = "/rate-status";
   const RATE_URL = "/rate";
-  const NATIVE_STREAM_QUALITY = "Native HLS";
-  const HLS_JS_STREAM_QUALITY = "HLS";
+  const NATIVE_STREAM_QUALITY = "Native HLS (browser-selected)";
+  const HLS_JS_STREAM_QUALITY = "HLS (hls.js)";
 
   const audioPlayer = document.getElementById("audio-player");
   const playBtn = document.getElementById("play-btn");
@@ -46,14 +46,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function onPlay() {
     playBtn.textContent = "⏸";
     playBtn.classList.add("playing");
-    startMetadataPolling();
     startTrackTimer(false);
   }
 
   function onStop() {
     playBtn.textContent = "▶";
     playBtn.classList.remove("playing");
-    stopMetadataPolling();
     stopTrackTimer();
   }
 
@@ -100,6 +98,32 @@ document.addEventListener("DOMContentLoaded", () => {
     hls.loadSource(HLS_JS_URL);
     hls.attachMedia(audioPlayer);
     playbackAttached = true;
+
+    hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+      const levels = data.levels || [];
+      const codecs = [
+        ...new Set(
+          levels
+            .map((level) => level.audioCodec)
+            .filter(Boolean)
+            .map((codec) => {
+              if (/^mp4a/i.test(codec)) return "AAC";
+              if (/flac/i.test(codec)) return "FLAC";
+              return codec;
+            }),
+        ),
+      ];
+      const bitrate = Math.max(
+        0,
+        ...levels.map((level) => level.bitrate || level.averageBitrate || 0),
+      );
+      const details = [];
+      if (codecs.length) details.push(codecs.join("/"));
+      if (bitrate) details.push(`${Math.round(bitrate / 1000)} kbps`);
+      streamQualityEl.textContent = details.length
+        ? `${details.join(", ")} / HLS (hls.js)`
+        : HLS_JS_STREAM_QUALITY;
+    });
 
     hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
@@ -261,11 +285,12 @@ document.addEventListener("DOMContentLoaded", () => {
     displayTrack(bufferedMetadata);
     renderHistory(bufferedMetadata);
     startTrackTimer();
-    // Changing only the fragment triggers an image refresh while preserving
-    // normal HTTP cache/revalidation behavior for the shared cover URL.
-    npCover.src = `${COVER_URL}#${encodeURIComponent(
-      getTrackKey(bufferedMetadata),
-    )}`;
+    // The provider exposes one mutable cover URL. Use a new query value only
+    // when the track changes so browsers and CDNs fetch the new artwork.
+    const coverUrl = new URL(COVER_URL);
+    coverUrl.searchParams.set("_track", getTrackKey(bufferedMetadata));
+    coverUrl.searchParams.set("_ts", String(Date.now()));
+    npCover.src = coverUrl.toString();
     bufferedMetadata = null;
   }
 
@@ -443,9 +468,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.hidden) {
       stopMetadataPolling();
       stopTrackTimer();
-    } else if (!audioPlayer.paused) {
+    } else {
       startMetadataPolling();
-      startTrackTimer(false);
+      if (!audioPlayer.paused) startTrackTimer(false);
     }
   });
 
@@ -471,9 +496,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   init();
-  // Populate now-playing content without downloading audio or repeatedly
-  // polling until the listener starts playback.
-  fetchMetadata();
+  // Keep a visible page synchronized with the live station even before
+  // playback starts or when Chrome pauses/stalls the audio element.
+  startMetadataPolling();
   setVolume(1);
   updateMuteIcon();
 });

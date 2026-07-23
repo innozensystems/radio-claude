@@ -294,9 +294,12 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
 - Loads the runtime-configured `STREAM_URL`.
 - Uses native HLS where reliable and the runtime-configured
   `HLS_FALLBACK_URL` with `hls.js` in Chromium.
-- Polls the runtime-configured `METADATA_URL` every 5 seconds during active
-  playback to update the now-playing display and five-track history.
+- Polls the runtime-configured `METADATA_URL` every 5 seconds while the page is
+  visible, including before playback and while audio is paused, to keep the
+  now-playing display and five-track history current.
 - Loads current artwork from the runtime-configured `COVER_URL`.
+- Labels the actual playback path as native browser-selected HLS or `hls.js`;
+  codec and bitrate are included when exposed by the parsed manifest.
 - Displays a track timer that resets whenever the polled metadata changes.
 - Ratings use a signed, HttpOnly voter cookie issued by the server.
 
