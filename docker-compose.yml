@@ -16,6 +16,10 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - APP_HOST=0.0.0.0
+      - STREAM_URL=${STREAM_URL:-}
+      - HLS_FALLBACK_URL=${HLS_FALLBACK_URL:-}
+      - METADATA_URL=${METADATA_URL:-}
+      - COVER_URL=${COVER_URL:-}
   # Production container
   radioclaude-prod:
     build:
@@ -32,6 +36,10 @@ services:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY:-}
       DATABASE_URL: postgresql://radioclaude:${POSTGRES_PASSWORD:-change-me}@postgres:5432/radioclaude
+      STREAM_URL: ${STREAM_URL:-}
+      HLS_FALLBACK_URL: ${HLS_FALLBACK_URL:-}
+      METADATA_URL: ${METADATA_URL:-}
+      COVER_URL: ${COVER_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
