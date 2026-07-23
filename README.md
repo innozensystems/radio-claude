@@ -298,8 +298,9 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
   visible, including before playback and while audio is paused, to keep the
   now-playing display and five-track history current.
 - Loads current artwork from the runtime-configured `COVER_URL`.
-- Labels the actual playback path as native browser-selected HLS or `hls.js`;
-  codec and bitrate are included when exposed by the parsed manifest.
+- Displays the known lossless label for the native-HLS path. On the
+  Chromium/hls.js path, reads the selected codec from `LEVEL_LOADED` or the
+  parsed audio buffer and displays FLAC, AAC, or the reported codec.
 - Displays a track timer that resets whenever the polled metadata changes.
 - Ratings use a signed, HttpOnly voter cookie issued by the server.
 

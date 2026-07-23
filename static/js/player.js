@@ -14,8 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const METADATA_POLL_MS = 5000;
   const RATE_STATUS_URL = "/rate-status";
   const RATE_URL = "/rate";
-  const NATIVE_STREAM_QUALITY = "Native HLS (browser-selected)";
-  const HLS_JS_STREAM_QUALITY = "HLS (hls.js)";
+  // Stream quality depends on the browser playback path, not the source
+  // track's own bit depth/sample rate.
+  const NATIVE_STREAM_QUALITY = "48kHz FLAC / HLS Lossless";
+  const HLS_JS_STREAM_QUALITY = "HLS (detecting quality…)";
 
   const audioPlayer = document.getElementById("audio-player");
   const playBtn = document.getElementById("play-btn");
@@ -99,30 +101,26 @@ document.addEventListener("DOMContentLoaded", () => {
     hls.attachMedia(audioPlayer);
     playbackAttached = true;
 
-    hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-      const levels = data.levels || [];
-      const codecs = [
-        ...new Set(
-          levels
-            .map((level) => level.audioCodec)
-            .filter(Boolean)
-            .map((codec) => {
-              if (/^mp4a/i.test(codec)) return "AAC";
-              if (/flac/i.test(codec)) return "FLAC";
-              return codec;
-            }),
-        ),
-      ];
-      const bitrate = Math.max(
-        0,
-        ...levels.map((level) => level.bitrate || level.averageBitrate || 0),
-      );
-      const details = [];
-      if (codecs.length) details.push(codecs.join("/"));
-      if (bitrate) details.push(`${Math.round(bitrate / 1000)} kbps`);
-      streamQualityEl.textContent = details.length
-        ? `${details.join(", ")} / HLS (hls.js)`
-        : HLS_JS_STREAM_QUALITY;
+    function updateHlsQuality(codec) {
+      if (!codec) return;
+      if (/flac/i.test(codec)) {
+        streamQualityEl.textContent = "48kHz FLAC / HLS Lossless";
+      } else if (/mp4a|aac/i.test(codec)) {
+        streamQualityEl.textContent = "AAC / HLS";
+      } else {
+        streamQualityEl.textContent = `${codec} / HLS`;
+      }
+    }
+
+    // A master playlist exposes the selected codec on its loaded level.
+    hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+      updateHlsQuality(hls.levels[data.level]?.audioCodec);
+    });
+
+    // A direct media playlist may not declare a codec until hls.js parses the
+    // first fragment, so also update from the codec used for the audio buffer.
+    hls.on(Hls.Events.BUFFER_CODECS, (event, data) => {
+      updateHlsQuality(data.audio?.codec || data.tracks?.audio?.codec);
     });
 
     hls.on(Hls.Events.ERROR, (event, data) => {
