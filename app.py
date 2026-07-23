@@ -44,6 +44,8 @@ def set_csp_header(response):
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(), geolocation=(), payment=()"
     )
+    if request.path == "/":
+        response.headers["Cache-Control"] = "no-cache"
 
     voter_cookie = getattr(g, "_voter_cookie", None)
     if voter_cookie:
