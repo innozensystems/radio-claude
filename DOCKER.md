@@ -59,6 +59,19 @@ To also delete the PostgreSQL volume and all database data:
 docker compose --profile prod down --volumes
 ```
 
+## Published Production Image
+
+Pushes and merges to `main` run tests and publish a multi-architecture
+production image to GitHub Container Registry:
+
+```text
+ghcr.io/<owner>/<repository>:latest
+ghcr.io/<owner>/<repository>:sha-<full-git-sha>
+```
+
+Use the SHA tag for a reproducible deployment or rollback. The workflow is
+defined in `.github/workflows/cd.yml` and authenticates with `GITHUB_TOKEN`.
+
 ## Building Images Standalone
 
 Build dev image:

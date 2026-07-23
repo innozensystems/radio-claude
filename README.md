@@ -90,6 +90,22 @@ Stop the production stack without deleting its database:
 docker compose --profile prod down
 ```
 
+## Continuous deployment
+
+Every push or merged pull request to `main` runs the unit and infrastructure
+security checks, then builds the production Docker target for AMD64 and ARM64.
+The workflow publishes both tags to GitHub Container Registry:
+
+```text
+ghcr.io/<owner>/<repository>:latest
+ghcr.io/<owner>/<repository>:sha-<full-git-sha>
+```
+
+The immutable SHA tag is recommended for deployments and rollbacks. Publishing
+uses the repository-provided `GITHUB_TOKEN`; no additional registry password is
+required. Package visibility is managed from the repository's Packages
+settings.
+
 ## Testing
 
 Backend routes are covered by a pytest suite in `tests/backend/`. Each test runs against an isolated temp SQLite database, not `data/app.db`.
