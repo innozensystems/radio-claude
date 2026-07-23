@@ -24,7 +24,15 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-There is no test suite, lint config, or formatter configured yet.
+Install dev dependencies and run the backend test suite:
+
+```bash
+source .venv/bin/activate
+python3 -m pip install -r requirements-dev.txt
+python3 -m pytest
+```
+
+There is no frontend test suite, lint config, or formatter configured. Frontend testing was scoped (Playwright e2e against mocked HLS/metadata endpoints) but deliberately skipped — not worth the added toolchain for this project's size.
 
 ## Architecture
 
@@ -35,6 +43,7 @@ There is no test suite, lint config, or formatter configured yet.
 - **Templates:** `templates/index.html` renders the initial page.
 - **Static assets:** `static/js/player.js`, `static/css/style.css`, and `static/img/`.
 - **Uploads:** user-uploaded audio files go to `uploads/`.
+- **Tests:** `tests/backend/` — pytest suite covering `/tracks`, `/audio`, `/rate`, `/rate-status`. Each test gets an isolated SQLite DB and uploads dir via `tmp_path` (never touches `data/app.db`). Enabled by making `DATABASE` configurable through `app.config["DATABASE"]` instead of a hardcoded module constant.
 
 ### Backend routes
 
