@@ -38,6 +38,44 @@ A single-page Flask app that plays a live HLS audio stream in the browser and le
 
 3. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
+## Docker Compose
+
+Docker Compose provides development and production configurations. Install
+[Docker Desktop](https://docs.docker.com/desktop/) or another Docker runtime
+with the Compose plugin before continuing.
+
+Build and start the development container:
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:5001](http://localhost:5001). The project directory is
+mounted into the container, so local code changes trigger Flask's development
+reload.
+
+Run the test suite in the development container:
+
+```bash
+docker compose exec radioclaude-dev pytest
+```
+
+Stop the containers:
+
+```bash
+docker compose down
+```
+
+To run the production image with Gunicorn:
+
+```bash
+docker compose --profile prod up --build radioclaude-prod
+```
+
+The production service also uses port
+[http://localhost:5001](http://localhost:5001) and persists its SQLite database
+and uploaded audio in the local `data/` and `uploads/` directories.
+
 ## Testing
 
 Backend routes are covered by a pytest suite in `tests/backend/`. Each test runs against an isolated temp SQLite database, not `data/app.db`.

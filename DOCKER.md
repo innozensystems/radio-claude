@@ -15,15 +15,15 @@ docker run -it -p 5000:5000 radioclaude:dev
 Or with docker-compose:
 
 ```bash
-docker-compose --profile dev up radioclaude-dev
+docker compose up
 ```
 
-Access the app at `http://localhost:5000`.
+Access the app at `http://localhost:5001`.
 
 Changes to local files trigger automatic reload. Run tests inside the container:
 
 ```bash
-docker-compose --profile dev exec radioclaude-dev pytest
+docker compose exec radioclaude-dev pytest
 ```
 
 ### Production Container
@@ -31,10 +31,10 @@ docker-compose --profile dev exec radioclaude-dev pytest
 Run with Gunicorn (production WSGI server):
 
 ```bash
-docker-compose --profile dev up radioclaude-prod
+docker compose --profile prod up radioclaude-prod
 ```
 
-Access the app at `http://localhost:5000`.
+Access the app at `http://localhost:5001`.
 
 Data and uploads persist in `./data` and `./uploads` directories.
 
