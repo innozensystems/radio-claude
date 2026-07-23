@@ -219,6 +219,10 @@ docker compose --profile prod ps
 docker compose --profile prod logs -f radioclaude-prod postgres nginx
 ```
 
+Nginx proxies `/static/` to the application container, so the HTML, JavaScript,
+and CSS always come from the same pulled image. A stale `./static` directory in
+the deployment checkout cannot override assets packaged in that image.
+
 For repeatable deployments, replace `latest` with the immutable
 `sha-<full-git-sha>` tag published by the CD workflow. If the PostgreSQL volume
 already exists, `POSTGRES_PASSWORD` must match the password used when that
