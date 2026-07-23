@@ -6,6 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // reliably append those segments through Media Source.
   const HLS_JS_URL =
     "https://d3d4yli4hf5bmh.cloudfront.net/hls/aac_hifi.m3u8";
+  const HLS_LIBRARY_URL =
+    "https://cdn.jsdelivr.net/npm/hls.js@1.6.16/dist/hls.min.js";
+  const HLS_LIBRARY_INTEGRITY =
+    "sha384-5E8B0pTlZZJMabWpC0fyYf6OUpe15jJij34BqBAh4NXoHAlLNOjCPRrwtOXOQFAn";
   const METADATA_URL = "https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json";
   const COVER_URL = "https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg";
   const METADATA_POLL_MS = 5000;
@@ -35,7 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const trackTimerEl = document.getElementById("track-timer");
 
   let hls = null;
+  let hlsLibraryPromise = null;
   let usingHlsJs = false;
+  let playbackAttached = false;
   let metadataTimer = null;
   let currentMetadata = null;
   let trackStartTime = null;
@@ -43,36 +49,60 @@ document.addEventListener("DOMContentLoaded", () => {
   function onPlay() {
     playBtn.textContent = "⏸";
     playBtn.classList.add("playing");
+    startMetadataPolling();
+    startTrackTimer(false);
   }
 
   function onStop() {
     playBtn.textContent = "▶";
     playBtn.classList.remove("playing");
+    stopMetadataPolling();
+    stopTrackTimer();
   }
 
   function attachNativeHls() {
     audioPlayer.src = HLS_URL;
-    audioPlayer.addEventListener("playing", onPlay);
-    audioPlayer.addEventListener("pause", onStop);
-    audioPlayer.addEventListener("error", () => {
-      console.warn("Stream error");
-    });
+    playbackAttached = true;
   }
 
-  function attachHlsJs() {
+  function loadHlsLibrary() {
+    if (typeof Hls !== "undefined") return Promise.resolve();
+    if (hlsLibraryPromise) return hlsLibraryPromise;
+
+    hlsLibraryPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = HLS_LIBRARY_URL;
+      script.integrity = HLS_LIBRARY_INTEGRITY;
+      script.crossOrigin = "anonymous";
+      script.async = true;
+      script.addEventListener("load", resolve, { once: true });
+      script.addEventListener(
+        "error",
+        () => reject(new Error("Unable to load hls.js")),
+        { once: true },
+      );
+      document.head.appendChild(script);
+    });
+
+    return hlsLibraryPromise;
+  }
+
+  async function attachHlsJs() {
+    await loadHlsLibrary();
     if (typeof Hls === "undefined" || !Hls.isSupported()) {
-      console.warn("HLS not supported in this browser");
-      return;
+      throw new Error("HLS not supported in this browser");
     }
 
     hls = new Hls({
       enableWorker: true,
       lowLatencyMode: true,
       backBufferLength: 90,
+      autoStartLoad: false,
     });
 
     hls.loadSource(HLS_JS_URL);
     hls.attachMedia(audioPlayer);
+    playbackAttached = true;
 
     hls.on(Hls.Events.ERROR, (event, data) => {
       if (data.fatal) {
@@ -89,13 +119,12 @@ document.addEventListener("DOMContentLoaded", () => {
             console.warn("Fatal stream error");
             hls.destroy();
             hls = null;
+            playbackAttached = false;
             break;
         }
       }
     });
 
-    audioPlayer.addEventListener("playing", onPlay);
-    audioPlayer.addEventListener("pause", onStop);
   }
 
   function init() {
@@ -113,11 +142,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (hasNativeHls && !isChromium) {
       streamQualityEl.textContent = NATIVE_STREAM_QUALITY;
-      attachNativeHls();
     } else {
       streamQualityEl.textContent = HLS_JS_STREAM_QUALITY;
       usingHlsJs = true;
-      attachHlsJs();
+    }
+  }
+
+  async function ensurePlaybackAttached() {
+    if (playbackAttached) return;
+    if (usingHlsJs) {
+      await attachHlsJs();
+    } else {
+      attachNativeHls();
     }
   }
 
@@ -202,13 +238,20 @@ document.addEventListener("DOMContentLoaded", () => {
     trackTimerEl.textContent = formatTime(elapsedSeconds);
   }
 
-  function startTrackTimer() {
+  function startTrackTimer(reset = true) {
     if (trackTimerInterval) {
       clearInterval(trackTimerInterval);
     }
-    trackStartTime = Date.now();
+    if (reset || !trackStartTime) trackStartTime = Date.now();
     updateTrackTimer();
+    if (audioPlayer.paused || document.hidden) return;
     trackTimerInterval = setInterval(updateTrackTimer, 1000);
+  }
+
+  function stopTrackTimer() {
+    if (!trackTimerInterval) return;
+    clearInterval(trackTimerInterval);
+    trackTimerInterval = null;
   }
 
   function getTrackKey(metadata) {
@@ -221,7 +264,11 @@ document.addEventListener("DOMContentLoaded", () => {
     displayTrack(bufferedMetadata);
     renderHistory(bufferedMetadata);
     startTrackTimer();
-    npCover.src = `${COVER_URL}?_=${Date.now()}`;
+    // Changing only the fragment triggers an image refresh while preserving
+    // normal HTTP cache/revalidation behavior for the shared cover URL.
+    npCover.src = `${COVER_URL}#${encodeURIComponent(
+      getTrackKey(bufferedMetadata),
+    )}`;
     bufferedMetadata = null;
   }
 
@@ -342,6 +389,12 @@ document.addEventListener("DOMContentLoaded", () => {
     metadataTimer = setInterval(fetchMetadata, METADATA_POLL_MS);
   }
 
+  function stopMetadataPolling() {
+    if (!metadataTimer) return;
+    clearInterval(metadataTimer);
+    metadataTimer = null;
+  }
+
   function updateMuteIcon() {
     const volume = audioPlayer.muted ? 0 : audioPlayer.volume;
     if (volume === 0) {
@@ -381,6 +434,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   audioPlayer.addEventListener("volumechange", updateMuteIcon);
+  audioPlayer.addEventListener("playing", onPlay);
+  audioPlayer.addEventListener("pause", onStop);
+  audioPlayer.addEventListener("ended", onStop);
+  audioPlayer.addEventListener("error", () => {
+    console.warn("Stream error");
+    onStop();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopMetadataPolling();
+      stopTrackTimer();
+    } else if (!audioPlayer.paused) {
+      startMetadataPolling();
+      startTrackTimer(false);
+    }
+  });
 
   playBtn.addEventListener("click", async () => {
     // Toggle based on the element's actual paused state so the button never
@@ -393,20 +463,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // If a previous fatal HLS error destroyed the hls.js instance, recreate
-    // it so playback can recover instead of silently failing on every click.
-    if (usingHlsJs && !hls) {
-      attachHlsJs();
-    }
-
-    // Resume HLS segment loading if it was stopped by a previous pause.
-    if (hls) {
-      hls.startLoad();
-    }
-
     try {
+      await ensurePlaybackAttached();
+      if (hls) hls.startLoad();
       await audioPlayer.play();
-      startMetadataPolling();
     } catch (err) {
       console.warn("Playback failed — check browser autoplay policy");
       console.error(err);
@@ -414,6 +474,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   init();
+  // Populate now-playing content without downloading audio or repeatedly
+  // polling until the listener starts playback.
+  fetchMetadata();
   setVolume(1);
   updateMuteIcon();
 });
