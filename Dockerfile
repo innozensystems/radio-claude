@@ -33,12 +33,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create directories for data and uploads
-RUN mkdir -p /app/data /app/uploads
+RUN groupadd --system app && useradd --system --gid app --home /app app \
+    && mkdir -p /app/data /app/uploads /run/radioclaude-secrets \
+    && chown -R app:app /app /run/radioclaude-secrets
+RUN chmod +x /app/docker/start-prod.sh
 
 # Expose port for production
 EXPOSE 5000
 
-# Run with Gunicorn for production
-RUN pip install --no-cache-dir gunicorn
-
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]
+# Initialize the database, then run the application behind Nginx.
+USER app
+CMD ["/app/docker/start-prod.sh"]

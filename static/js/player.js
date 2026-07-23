@@ -40,21 +40,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentMetadata = null;
   let trackStartTime = null;
   let trackTimerInterval = null;
-  let currentUserId = getUserId();
-
-  function getUserId() {
-    let id = localStorage.getItem("radio_user_id");
-    if (!id) {
-      id = crypto.randomUUID ? crypto.randomUUID() : generateRandomId();
-      localStorage.setItem("radio_user_id", id);
-    }
-    return id;
-  }
-
-  function generateRandomId() {
-    return "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
-
   function onPlay() {
     playBtn.textContent = "⏸";
     playBtn.classList.add("playing");
@@ -274,7 +259,6 @@ document.addEventListener("DOMContentLoaded", () => {
   async function fetchRatingStatus(metadata) {
     if (!metadata || !metadata.title) return;
     const params = new URLSearchParams({
-      user_id: currentUserId,
       title: metadata.title,
       artist: metadata.artist || "",
       album: metadata.album || "",
@@ -296,7 +280,6 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: currentUserId,
           title: currentMetadata.title,
           artist: currentMetadata.artist || "",
           album: currentMetadata.album || "",

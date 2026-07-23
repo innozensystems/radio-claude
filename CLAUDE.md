@@ -58,14 +58,14 @@ There is no frontend test suite, lint config, or formatter configured. Frontend 
 ### Frontend behavior
 
 - Loads the live HLS stream at `https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8`.
-- Uses native HLS support when available; otherwise falls back to `hls.js` loaded from CDN.
+- Uses native HLS where reliable and a pinned AAC `hls.js` path in Chromium.
 - Polls `https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json` every 3 seconds to update the now-playing display and a five-track history list.
 - Displays a track timer that resets whenever the polled metadata changes.
-- Ratings use a `user_id` generated once and stored in `localStorage`.
+- Ratings use a signed, HttpOnly voter cookie issued by the server.
 
 ## Development notes
 
 - The `.gitignore` excludes `data/`, `uploads/`, `.venv/`, `__pycache__/`, `.env`, and `.env.local`.
 - `app.config["MAX_CONTENT_LENGTH"]` is set to 32 MB for uploads.
-- Flask runs with `debug=True` in the `__main__` block.
+- Flask debug mode is enabled only when `FLASK_DEBUG=1`.
 - `RadioClaude_Style_Guide.txt` documents brand colors, typography, and UI patterns, but the current CSS does not fully follow it.

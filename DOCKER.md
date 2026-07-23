@@ -28,15 +28,36 @@ docker compose exec radioclaude-dev pytest
 
 ### Production Container
 
-Run with Gunicorn (production WSGI server):
+Production uses Nginx as its public web server, Gunicorn for the Flask
+application, and PostgreSQL for persistent relational data. Set a strong
+database password before starting the stack:
 
 ```bash
-docker compose --profile prod up radioclaude-prod
+export POSTGRES_PASSWORD='replace-with-a-strong-password'
+docker compose --profile prod up --build nginx
 ```
+
+If `SECRET_KEY` is not provided, the application generates one on first
+startup and stores it in the persistent `app_secrets` Docker volume. An
+externally managed `SECRET_KEY` environment variable takes precedence.
 
 Access the app at `http://localhost:5001`.
 
-Data and uploads persist in `./data` and `./uploads` directories.
+PostgreSQL data persists in the `postgres_data` Docker volume. Uploaded audio
+persists in the `uploads_data` Docker volume. Nginx is the only service with a host port; the
+Gunicorn and PostgreSQL services are internal to the Compose network.
+
+Stop the stack without deleting PostgreSQL data:
+
+```bash
+docker compose --profile prod down
+```
+
+To also delete the PostgreSQL volume and all database data:
+
+```bash
+docker compose --profile prod down --volumes
+```
 
 ## Building Images Standalone
 
@@ -65,27 +86,21 @@ docker run -it --rm \
   radioclaude:dev
 ```
 
-Prod container with persistent volumes:
-
-```bash
-docker run -d --rm \
-  -p 5000:5000 \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/uploads:/app/uploads \
-  -e FLASK_ENV=production \
-  radioclaude:prod
-```
+Use Docker Compose for production because the application requires the
+PostgreSQL and Nginx services.
 
 ## File Structure
 
 - `Dockerfile` — multi-stage build (dev and prod targets)
 - `docker-compose.yml` — orchestrates dev and prod services
+- `docker/nginx.conf` — Nginx reverse-proxy configuration
+- `docker/start-prod.sh` — initializes PostgreSQL and starts Gunicorn
 - `.dockerignore` — excludes unnecessary files from build context
 
 ## Notes
 
-- Dev image runs Flask with `debug=True` for hot-reload and error pages
-- Prod image uses Gunicorn with 4 workers for concurrent requests
+- Dev image runs Flask with debug mode explicitly enabled for hot-reload
+- Prod image runs as an unprivileged user with Gunicorn behind Nginx
 - Both share the same base layer to minimize total image size
-- Volumes for `data/` and `uploads/` persist data across container restarts
-- SQLite database is stored in `data/app.db` (created automatically)
+- PostgreSQL and uploaded audio persist across production container restarts
+- Development and automated tests continue to use SQLite

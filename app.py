@@ -1,9 +1,12 @@
-"""Flask single-page app with SQLite and audio tracks."""
+"""Flask single-page app with audio tracks and ratings."""
 
 import os
+import secrets
 import sqlite3
+import uuid
 
 from flask import Flask, g, jsonify, render_template, request, send_from_directory
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 DATABASE = os.path.join(os.path.dirname(__file__), "data", "app.db")
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
@@ -14,7 +17,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB
-app.config["DATABASE"] = DATABASE
+app.config["DATABASE"] = os.environ.get("DATABASE_URL", DATABASE)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+
+VOTER_COOKIE = "radio_voter"
+VOTER_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 
 
 @app.after_request
@@ -27,16 +34,75 @@ def set_csp_header(response):
         "worker-src blob:; "
         "img-src 'self' https://d3d4yli4hf5bmh.cloudfront.net https://fonts.gstatic.com; "
         "font-src https://fonts.gstatic.com; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'; "
         "default-src 'self'"
     )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=(), payment=()"
+    )
+
+    voter_cookie = getattr(g, "_voter_cookie", None)
+    if voter_cookie:
+        response.set_cookie(
+            VOTER_COOKIE,
+            voter_cookie,
+            max_age=VOTER_COOKIE_MAX_AGE,
+            httponly=True,
+            secure=request.is_secure,
+            samesite="Strict",
+        )
     return response
+
+
+def is_postgres(database=None):
+    database = database or app.config["DATABASE"]
+    return database.startswith(("postgresql://", "postgres://"))
+
+
+def connect_db(database=None):
+    database = database or app.config["DATABASE"]
+    if is_postgres(database):
+        import psycopg
+        from psycopg.rows import dict_row
+
+        return psycopg.connect(database, row_factory=dict_row)
+
+    connection = sqlite3.connect(database)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def execute(db, query, params=()):
+    if is_postgres():
+        query = query.replace("?", "%s")
+    return db.execute(query, params)
+
+
+def voter_serializer():
+    return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="radio-voter")
+
+
+def current_voter_id():
+    token = request.cookies.get(VOTER_COOKIE)
+    if token:
+        try:
+            return voter_serializer().loads(token, max_age=VOTER_COOKIE_MAX_AGE)
+        except (BadSignature, SignatureExpired):
+            pass
+
+    voter_id = str(uuid.uuid4())
+    g._voter_cookie = voter_serializer().dumps(voter_id)
+    return voter_id
 
 
 def get_db():
     db = getattr(g, "_database", None)
     if db is None:
-        db = g._database = sqlite3.connect(app.config["DATABASE"])
-        db.row_factory = sqlite3.Row
+        db = g._database = connect_db()
     return db
 
 
@@ -48,11 +114,18 @@ def close_connection(exception):
 
 
 def init_db(db_path=None):
-    with sqlite3.connect(db_path or app.config["DATABASE"]) as conn:
+    database = db_path or app.config["DATABASE"]
+    primary_key = (
+        "BIGSERIAL PRIMARY KEY"
+        if is_postgres(database)
+        else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    )
+
+    with connect_db(database) as conn:
         conn.execute(
-            """
+            f"""
             CREATE TABLE IF NOT EXISTS tracks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {primary_key},
                 title TEXT NOT NULL,
                 artist TEXT,
                 filename TEXT NOT NULL,
@@ -61,9 +134,9 @@ def init_db(db_path=None):
             """
         )
         conn.execute(
-            """
+            f"""
             CREATE TABLE IF NOT EXISTS ratings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {primary_key},
                 user_id TEXT NOT NULL,
                 title TEXT NOT NULL,
                 artist TEXT,
@@ -85,7 +158,8 @@ def index():
 @app.route("/tracks", methods=["GET"])
 def list_tracks():
     db = get_db()
-    rows = db.execute(
+    rows = execute(
+        db,
         "SELECT id, title, artist, filename FROM tracks ORDER BY created_at DESC"
     ).fetchall()
     tracks = [
@@ -120,12 +194,22 @@ def create_track():
     file.save(saved_path)
 
     db = get_db()
-    cursor = db.execute(
-        "INSERT INTO tracks (title, artist, filename) VALUES (?, ?, ?)",
-        (title, artist, os.path.basename(saved_path)),
-    )
+    params = (title, artist, os.path.basename(saved_path))
+    if is_postgres():
+        cursor = execute(
+            db,
+            "INSERT INTO tracks (title, artist, filename) VALUES (?, ?, ?) RETURNING id",
+            params,
+        )
+        track_id = cursor.fetchone()["id"]
+    else:
+        cursor = execute(
+            db,
+            "INSERT INTO tracks (title, artist, filename) VALUES (?, ?, ?)",
+            params,
+        )
+        track_id = cursor.lastrowid
     db.commit()
-    track_id = cursor.lastrowid
 
     return jsonify(
         {
@@ -145,32 +229,33 @@ def serve_audio(filename):
 @app.route("/rate", methods=["POST"])
 def rate_song():
     data = request.get_json(force=True, silent=True) or {}
-    user_id = (data.get("user_id") or "").strip()
+    user_id = current_voter_id()
     title = (data.get("title") or "").strip()
     artist = (data.get("artist") or "").strip()
     album = (data.get("album") or "").strip()
     rating = (data.get("rating") or "").strip().lower()
 
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
     if not title:
         return jsonify({"error": "title is required"}), 400
     if rating not in ("up", "down"):
         return jsonify({"error": "rating must be 'up' or 'down'"}), 400
 
     db = get_db()
-    existing = db.execute(
+    existing = execute(
+        db,
         "SELECT id, rating FROM ratings WHERE user_id = ? AND title = ? AND artist = ? AND album = ?",
         (user_id, title, artist, album),
     ).fetchone()
 
     if existing is None:
-        db.execute(
+        execute(
+            db,
             "INSERT INTO ratings (user_id, title, artist, album, rating) VALUES (?, ?, ?, ?, ?)",
             (user_id, title, artist, album, rating),
         )
     elif existing["rating"] != rating:
-        db.execute(
+        execute(
+            db,
             "UPDATE ratings SET rating = ? WHERE id = ?",
             (rating, existing["id"]),
         )
@@ -181,13 +266,11 @@ def rate_song():
 
 @app.route("/rate-status", methods=["GET"])
 def rate_status():
-    user_id = (request.args.get("user_id") or "").strip()
+    user_id = current_voter_id()
     title = (request.args.get("title") or "").strip()
     artist = (request.args.get("artist") or "").strip()
     album = (request.args.get("album") or "").strip()
 
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
     if not title:
         return jsonify({"error": "title is required"}), 400
 
@@ -197,14 +280,16 @@ def rate_status():
 def get_rating_summary(title, artist, album, user_id):
     db = get_db()
     params = [title, artist, album]
-    counts = db.execute(
+    counts = execute(
+        db,
         "SELECT rating, COUNT(*) AS n FROM ratings WHERE title = ? AND artist = ? AND album = ? GROUP BY rating",
         params,
     ).fetchall()
     up_count = sum(row["n"] for row in counts if row["rating"] == "up")
     down_count = sum(row["n"] for row in counts if row["rating"] == "down")
 
-    user_row = db.execute(
+    user_row = execute(
+        db,
         "SELECT rating FROM ratings WHERE user_id = ? AND title = ? AND artist = ? AND album = ?",
         [user_id] + params,
     ).fetchone()
@@ -219,11 +304,13 @@ def get_rating_summary(title, artist, album, user_id):
 @app.route("/tracks/<int:track_id>", methods=["DELETE"])
 def delete_track(track_id):
     db = get_db()
-    row = db.execute("SELECT filename FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    row = execute(
+        db, "SELECT filename FROM tracks WHERE id = ?", (track_id,)
+    ).fetchone()
     if row is None:
         return jsonify({"error": "Track not found"}), 404
 
-    db.execute("DELETE FROM tracks WHERE id = ?", (track_id,))
+    execute(db, "DELETE FROM tracks WHERE id = ?", (track_id,))
     db.commit()
 
     audio_path = os.path.join(app.config["UPLOAD_FOLDER"], row["filename"])
@@ -233,6 +320,16 @@ def delete_track(track_id):
     return jsonify({"deleted": track_id})
 
 
+@app.route("/health")
+def health():
+    execute(get_db(), "SELECT 1").fetchone()
+    return jsonify({"status": "ok"})
+
+
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(
+        host=os.environ.get("APP_HOST", "127.0.0.1"),
+        port=5000,
+        debug=os.environ.get("FLASK_DEBUG") == "1",
+    )

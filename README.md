@@ -5,17 +5,18 @@ A single-page Flask app that plays a live HLS audio stream in the browser and le
 ## Features
 
 - **Live HLS stream playback** with native support or an `hls.js` fallback
-- **Now-playing metadata** polled every 3 seconds from the stream server
+- **Now-playing metadata** polled every 5 seconds from the stream server
 - **Track history** showing the last five played tracks
 - **Thumbs up/down ratings** per track, aggregated across listeners
-- **Per-listener identity** via a UUID stored in `localStorage`
-- **Audio upload library** with SQLite-backed metadata, playable on demand
+- **Per-listener identity** via a signed, HttpOnly cookie
+- **Audio upload library** with database-backed metadata, playable on demand
 - **Flask debug server** for local development
 
 ## Stack
 
 - **Flask** — Python web framework
-- **SQLite** — file-based database for tracks and ratings
+- **SQLite / PostgreSQL** — SQLite locally and PostgreSQL in production
+- **Gunicorn + Nginx** — production application and reverse-proxy servers
 - **Vanilla JavaScript + HTML/CSS** — no build step or frontend framework
 - **hls.js** — HLS fallback loaded from CDN
 
@@ -66,15 +67,28 @@ Stop the containers:
 docker compose down
 ```
 
-To run the production image with Gunicorn:
+Production runs Nginx in front of Gunicorn and uses PostgreSQL. Set a database
+password, then start the Nginx service and its dependencies:
 
 ```bash
-docker compose --profile prod up --build radioclaude-prod
+export POSTGRES_PASSWORD='replace-with-a-strong-password'
+docker compose --profile prod up --build nginx
 ```
 
-The production service also uses port
-[http://localhost:5001](http://localhost:5001) and persists its SQLite database
-and uploaded audio in the local `data/` and `uploads/` directories.
+The first production startup generates a signing key in the persistent
+`app_secrets` volume. Set `SECRET_KEY` explicitly before startup if secrets are
+managed externally.
+
+Open [http://localhost:5001](http://localhost:5001). PostgreSQL data is stored
+in the named `postgres_data` Docker volume, while uploaded audio persists in
+the named `uploads_data` volume. Gunicorn and PostgreSQL are only reachable
+inside the Compose network; Nginx is the public entry point.
+
+Stop the production stack without deleting its database:
+
+```bash
+docker compose --profile prod down
+```
 
 ## Testing
 
@@ -96,6 +110,11 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
 ├── requirements.txt       # Python dependencies
 ├── requirements-dev.txt   # Dev/test dependencies (pytest)
 ├── pytest.ini             # pytest config
+├── Dockerfile             # Development and production application images
+├── docker-compose.yml     # Development and production service definitions
+├── docker/
+│   ├── nginx.conf         # Production reverse-proxy configuration
+│   └── start-prod.sh      # Database initialization and Gunicorn startup
 ├── tests/
 │   └── backend/           # pytest suite for Flask routes
 ├── data/                  # SQLite database (created at runtime)
@@ -121,19 +140,21 @@ There's no frontend test suite — it was scoped (Playwright e2e against mocked 
 | `GET`  | `/audio/<filename>` | Stream an uploaded audio file |
 | `POST` | `/rate` | Record or update a user's up/down rating for a track |
 | `GET`  | `/rate-status` | Aggregate up/down counts plus the current user's rating |
+| `GET` | `/health` | Application and database health check |
 
 ## Frontend behavior
 
 - Loads the live HLS stream at `https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8`.
-- Uses native HLS support when available; otherwise falls back to `hls.js` from CDN.
-- Polls `https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json` every 3 seconds to update the now-playing display and a five-track history list.
+- Uses native HLS where reliable and an AAC `hls.js` path in Chromium.
+- Polls `https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json` every 5 seconds to update the now-playing display and a five-track history list.
 - Displays a track timer that resets whenever the polled metadata changes.
-- Ratings use a `user_id` generated once and stored in `localStorage`.
+- Ratings use a signed, HttpOnly voter cookie issued by the server.
 
 ## Development notes
 
 - The SQLite database and `uploads/` directory are created automatically on first run.
+- Setting `DATABASE_URL` to a PostgreSQL URL switches the application to PostgreSQL.
 - `app.config["MAX_CONTENT_LENGTH"]` is set to 32 MB for uploads.
-- Flask runs with `debug=True` in the `__main__` block.
+- Flask debug mode is enabled only when `FLASK_DEBUG=1`.
 - The `.gitignore` excludes `data/`, `uploads/`, `.venv/`, `__pycache__/`, `.env`, and `.env.local`.
 - `RadioClaude_Style_Guide.txt` documents the brand palette and UI patterns.
