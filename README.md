@@ -106,6 +106,54 @@ uses the repository-provided `GITHUB_TOKEN`; no additional registry password is
 required. Package visibility is managed from the repository's Packages
 settings.
 
+### Run the production image in standalone mode
+
+To run the production application image locally without Nginx or PostgreSQL:
+
+```bash
+docker run --rm \
+  -p 127.0.0.1:5001:5000 \
+  ghcr.io/innozensystems/radio-claude:latest
+```
+
+Open [http://localhost:5001](http://localhost:5001). This standalone mode uses
+SQLite inside the container and is intended for quick local verification.
+Stopping the container removes its database because `--rm` is enabled. Use the
+production Compose command above when PostgreSQL, persistent volumes, and Nginx
+are required.
+
+### Run the published image with the production stack
+
+For a production-grade local deployment, run the published application image
+with PostgreSQL, persistent volumes, and Nginx:
+
+```bash
+docker pull ghcr.io/innozensystems/radio-claude:latest
+
+# Tag the published image with the name expected by this Compose project.
+docker tag \
+  ghcr.io/innozensystems/radio-claude:latest \
+  radioclaude-radioclaude-prod:latest
+
+export POSTGRES_PASSWORD='a-strong-password'
+
+# Use the pulled image instead of rebuilding it locally.
+docker compose --profile prod up -d --no-build nginx
+```
+
+Open [http://localhost:5001](http://localhost:5001). Confirm that PostgreSQL,
+Gunicorn, and Nginx are healthy:
+
+```bash
+docker compose --profile prod ps
+docker compose --profile prod logs -f radioclaude-prod postgres nginx
+```
+
+For repeatable deployments, replace `latest` with the immutable
+`sha-<full-git-sha>` tag published by the CD workflow. If the PostgreSQL volume
+already exists, `POSTGRES_PASSWORD` must match the password used when that
+volume was first initialized.
+
 ## Testing
 
 Backend routes are covered by a pytest suite in `tests/backend/`. Each test runs against an isolated temp SQLite database, not `data/app.db`.
