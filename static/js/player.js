@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const trackTimerEl = document.getElementById("track-timer");
 
   let hls = null;
+  let usingHlsJs = false;
   let metadataTimer = null;
   let currentMetadata = null;
   let trackStartTime = null;
@@ -63,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function attachHlsJs() {
-    if (!Hls.isSupported()) {
+    if (typeof Hls === "undefined" || !Hls.isSupported()) {
       console.warn("HLS not supported in this browser");
       return;
     }
@@ -91,6 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
           default:
             console.warn("Fatal stream error");
             hls.destroy();
+            hls = null;
             break;
         }
       }
@@ -104,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (audioPlayer.canPlayType("application/vnd.apple.mpegurl")) {
       attachNativeHls();
     } else {
+      usingHlsJs = true;
       attachHlsJs();
     }
   }
@@ -380,6 +383,12 @@ document.addEventListener("DOMContentLoaded", () => {
         hls.stopLoad();
       }
       return;
+    }
+
+    // If a previous fatal HLS error destroyed the hls.js instance, recreate
+    // it so playback can recover instead of silently failing on every click.
+    if (usingHlsJs && !hls) {
+      attachHlsJs();
     }
 
     // Resume HLS segment loading if it was stopped by a previous pause.
