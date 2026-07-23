@@ -28,6 +28,76 @@ endpoint. Configure only sources that you own or have permission to use.
 - **Vanilla JavaScript + HTML/CSS** — no build step or frontend framework
 - **hls.js** — HLS fallback loaded from CDN
 
+## Architecture
+
+```mermaid
+flowchart TB
+    Browser["Listener browser<br/>HTML, CSS, player.js"]
+
+    subgraph Playback["Browser playback and live metadata"]
+        Audio["HTML audio player"]
+        HlsJs["hls.js<br/>Chromium and MSE browsers"]
+        NativeHls["Native HLS<br/>primarily Safari"]
+        Poller["Metadata poller<br/>every 5 seconds while visible"]
+        Quality["Dynamic quality detection<br/>LEVEL_LOADED / BUFFER_CODECS"]
+        RatingsUI["Rating controls"]
+    end
+
+    subgraph Runtime["Production Docker Compose stack"]
+        Nginx["Nginx<br/>port 5001 → 80<br/>rate limits, gzip, security headers"]
+
+        subgraph AppContainer["radioclaude-prod container"]
+            Gunicorn["Gunicorn<br/>port 5000"]
+            Flask["Flask application"]
+            Pages["Rendered page and static assets"]
+            API["Ratings, tracks, audio, and health APIs"]
+        end
+
+        Postgres[("PostgreSQL 17<br/>ratings and track metadata")]
+        Uploads[("uploads_data<br/>uploaded audio")]
+        Secrets[("app_secrets<br/>cookie-signing key")]
+    end
+
+    subgraph External["Authorized external media services"]
+        Stream["STREAM_URL<br/>primary HLS"]
+        Fallback["HLS_FALLBACK_URL<br/>browser-compatible HLS"]
+        Metadata["METADATA_URL<br/>now-playing JSON"]
+        Cover["COVER_URL<br/>current artwork"]
+        CDN["jsDelivr<br/>hls.js"]
+    end
+
+    subgraph Delivery["CI/CD"]
+        GitHub["GitHub main branch"]
+        Tests["GitHub Actions<br/>pytest and security checks"]
+        Build["Multi-platform Docker build<br/>AMD64 and ARM64"]
+        GHCR["GHCR<br/>latest and immutable SHA tags"]
+        Host["Deployment host<br/>docker pull and compose up"]
+    end
+
+    Browser --> Nginx
+    Nginx --> Gunicorn --> Flask
+    Flask --> Pages
+    Flask --> API
+    API --> Postgres
+    API --> Uploads
+    Flask --> Secrets
+
+    Browser --> Audio
+    Audio --> HlsJs --> Fallback
+    Audio --> NativeHls --> Stream
+    HlsJs --> Quality
+    HlsJs -. "load on demand" .-> CDN
+    Browser --> Poller
+    Poller --> Metadata
+    Poller --> Cover
+    Browser --> RatingsUI --> Nginx
+
+    GitHub --> Tests --> Build --> GHCR --> Host --> Runtime
+```
+
+The editable, comprehensive Mermaid source is available at
+[`docs/architecture.mmd`](docs/architecture.mmd).
+
 ## Quick start
 
 1. Create and activate a virtual environment, then install dependencies:
