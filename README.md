@@ -54,18 +54,19 @@ endpoint. Configure only sources that you own or have permission to use.
 
 ## Stream configuration
 
-The application requires these runtime environment variables:
+The application uses these runtime environment variables:
 
-| Variable | Purpose |
-|---|---|
-| `STREAM_URL` | Primary HLS stream used by browsers with reliable native HLS |
-| `HLS_FALLBACK_URL` | Browser-compatible HLS rendition used by `hls.js`; defaults to `STREAM_URL` when omitted |
-| `METADATA_URL` | JSON now-playing metadata and track-history endpoint |
-| `COVER_URL` | Current cover-art image endpoint |
+| Variable | Required | Purpose |
+|---|---|---|
+| `STREAM_URL` | Yes | Primary HLS stream used by browsers with reliable native HLS |
+| `HLS_FALLBACK_URL` | No | Browser-compatible HLS rendition used by `hls.js`; defaults to `STREAM_URL` when omitted |
+| `METADATA_URL` | Yes | JSON now-playing metadata and track-history endpoint |
+| `COVER_URL` | Yes | Current cover-art image endpoint |
 
-All values must be absolute `http://` or `https://` URLs. The application
-refuses to start when required configuration is missing or malformed. The
-configured origins are added to Content Security Policy at runtime.
+Every supplied value must be an absolute `http://` or `https://` URL. The
+application refuses to start when required configuration is missing or any
+configured URL is malformed. The configured origins are added to Content
+Security Policy at runtime.
 
 The checked-in `.env.example` contains placeholders only. `.env` and other
 `.env.*` files are ignored so real endpoints are not copied into Git history.
