@@ -14,12 +14,13 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB
+app.config["DATABASE"] = DATABASE
 
 
 def get_db():
     db = getattr(g, "_database", None)
     if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
+        db = g._database = sqlite3.connect(app.config["DATABASE"])
         db.row_factory = sqlite3.Row
     return db
 
@@ -31,8 +32,8 @@ def close_connection(exception):
         db.close()
 
 
-def init_db():
-    with sqlite3.connect(DATABASE) as conn:
+def init_db(db_path=None):
+    with sqlite3.connect(db_path or app.config["DATABASE"]) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tracks (
