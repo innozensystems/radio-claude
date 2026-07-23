@@ -5,6 +5,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const METADATA_POLL_MS = 5000;
   const RATE_STATUS_URL = "/rate-status";
   const RATE_URL = "/rate";
+  // The HLS stream is always delivered at this fixed encoding, independent of
+  // the source track's own bit depth/sample rate — the CDN transcodes every
+  // track to the same lossless FLAC-in-HLS format, so unlike source quality
+  // this isn't something the per-track metadata can report.
+  const STREAM_QUALITY = "48kHz FLAC / HLS Lossless";
 
   const audioPlayer = document.getElementById("audio-player");
   const playBtn = document.getElementById("play-btn");
@@ -15,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const npArtist = document.getElementById("np-artist");
   const npAlbum = document.getElementById("np-album");
   const sourceQualityEl = document.getElementById("source-quality");
+  const streamQualityEl = document.getElementById("stream-quality");
   const historyList = document.getElementById("history-list");
   const rateUpBtn = document.getElementById("rate-up");
   const rateDownBtn = document.getElementById("rate-down");
@@ -103,6 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function init() {
+    streamQualityEl.textContent = STREAM_QUALITY;
     if (audioPlayer.canPlayType("application/vnd.apple.mpegurl")) {
       attachNativeHls();
     } else {
