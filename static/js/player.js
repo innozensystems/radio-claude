@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const HLS_URL = "https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8";
   const METADATA_URL = "https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json";
   const COVER_URL = "https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg";
-  const METADATA_POLL_MS = 3000;
+  const METADATA_POLL_MS = 5000;
   const RATE_STATUS_URL = "/rate-status";
   const RATE_URL = "/rate";
 
