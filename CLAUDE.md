@@ -12,10 +12,11 @@ Run the app (also initializes the SQLite database):
 
 ```bash
 source .venv/bin/activate
-set -a
-source .env
-set +a
-python3 app.py
+STREAM_URL='https://authorized-host.example/path/live.m3u8' \
+HLS_FALLBACK_URL='https://authorized-host.example/path/browser-compatible.m3u8' \
+METADATA_URL='https://authorized-host.example/path/metadata.json' \
+COVER_URL='https://authorized-host.example/path/cover.jpg' \
+  python3 app.py
 ```
 
 The server starts on `http://127.0.0.1:5000` with Flask debug mode enabled.
@@ -72,9 +73,10 @@ There is no frontend test suite, lint config, or formatter configured. Frontend 
 
 ## Development notes
 
-- Copy `.env.example` to `.env` and use only stream sources the operator is
-  authorized to embed. Never commit real endpoints, signed URLs, or media.
-- The `.gitignore` excludes local `.env.*` files but retains `.env.example`.
+- Pass runtime URL environment variables directly to launch commands and use
+  only stream sources the operator is authorized to embed. Never commit real
+  endpoints, signed URLs, or media.
+- The `.gitignore` excludes local `.env*` files.
 - `app.config["MAX_CONTENT_LENGTH"]` is set to 32 MB for uploads.
 - Flask debug mode is enabled only when `FLASK_DEBUG=1`.
 - `RadioClaude_Style_Guide.txt` documents brand colors, typography, and UI patterns, but the current CSS does not fully follow it.
