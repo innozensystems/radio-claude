@@ -17,6 +17,21 @@ app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB
 app.config["DATABASE"] = DATABASE
 
 
+@app.after_request
+def set_csp_header(response):
+    response.headers["Content-Security-Policy"] = (
+        "script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' https://fonts.googleapis.com; "
+        "connect-src 'self' https://d3d4yli4hf5bmh.cloudfront.net; "
+        "media-src https://d3d4yli4hf5bmh.cloudfront.net blob:; "
+        "worker-src blob:; "
+        "img-src 'self' https://d3d4yli4hf5bmh.cloudfront.net https://fonts.gstatic.com; "
+        "font-src https://fonts.gstatic.com; "
+        "default-src 'self'"
+    )
+    return response
+
+
 def get_db():
     db = getattr(g, "_database", None)
     if db is None:

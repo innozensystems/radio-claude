@@ -1,15 +1,20 @@
 document.addEventListener("DOMContentLoaded", () => {
   const HLS_URL = "https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8";
+  // Chromium uses hls.js/Media Source instead of native HLS. Point that path
+  // at the AAC rendition explicitly: the master playlist also advertises a
+  // FLAC/fMP4 rendition which Chromium may select even though it cannot
+  // reliably append those segments through Media Source.
+  const HLS_JS_URL =
+    "https://d3d4yli4hf5bmh.cloudfront.net/hls/aac_hifi.m3u8";
   const METADATA_URL = "https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json";
   const COVER_URL = "https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg";
   const METADATA_POLL_MS = 5000;
   const RATE_STATUS_URL = "/rate-status";
   const RATE_URL = "/rate";
-  // The HLS stream is always delivered at this fixed encoding, independent of
-  // the source track's own bit depth/sample rate — the CDN transcodes every
-  // track to the same lossless FLAC-in-HLS format, so unlike source quality
-  // this isn't something the per-track metadata can report.
-  const STREAM_QUALITY = "48kHz FLAC / HLS Lossless";
+  // Stream quality depends on the browser playback path, not the source
+  // track's own bit depth/sample rate.
+  const NATIVE_STREAM_QUALITY = "48kHz FLAC / HLS Lossless";
+  const HLS_JS_STREAM_QUALITY = "AAC / HLS";
 
   const audioPlayer = document.getElementById("audio-player");
   const playBtn = document.getElementById("play-btn");
@@ -81,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
       backBufferLength: 90,
     });
 
-    hls.loadSource(HLS_URL);
+    hls.loadSource(HLS_JS_URL);
     hls.attachMedia(audioPlayer);
 
     hls.on(Hls.Events.ERROR, (event, data) => {
@@ -109,10 +114,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function init() {
-    streamQualityEl.textContent = STREAM_QUALITY;
-    if (audioPlayer.canPlayType("application/vnd.apple.mpegurl")) {
+    // Recent Chromium versions report that they can play HLS natively, but
+    // still fail to demux this stream (DEMUXER_ERROR_COULD_NOT_PARSE). Keep
+    // Chromium on the hls.js compatibility path and reserve native HLS for
+    // browsers such as Safari.
+    const isChromium =
+      navigator.userAgentData?.brands?.some((brand) =>
+        /Chromium|Google Chrome|Microsoft Edge/.test(brand.brand),
+      ) || /(?:Chrome|Chromium|CriOS|Edg)\//.test(navigator.userAgent);
+    const hasNativeHls = Boolean(
+      audioPlayer.canPlayType("application/vnd.apple.mpegurl"),
+    );
+
+    if (hasNativeHls && !isChromium) {
+      streamQualityEl.textContent = NATIVE_STREAM_QUALITY;
       attachNativeHls();
     } else {
+      streamQualityEl.textContent = HLS_JS_STREAM_QUALITY;
       usingHlsJs = true;
       attachHlsJs();
     }
