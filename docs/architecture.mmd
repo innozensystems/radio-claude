@@ -1,0 +1,147 @@
+flowchart TB
+    classDef client fill:#e8f4ff,stroke:#2878b5,color:#102a43
+    classDef edge fill:#fff4d6,stroke:#c58b00,color:#4d3500
+    classDef app fill:#eaf8ec,stroke:#2f855a,color:#173d2a
+    classDef data fill:#f3e8ff,stroke:#805ad5,color:#35225e
+    classDef external fill:#fff0f0,stroke:#c53030,color:#5a1717
+    classDef delivery fill:#edf2f7,stroke:#4a5568,color:#1a202c
+
+    subgraph Runtime["Production runtime — Docker Compose prod profile"]
+        direction TB
+
+        subgraph Client["Listener device"]
+            direction TB
+            Browser["Web browser<br/>Chrome, Edge, Safari, Firefox"]:::client
+            UI["Single-page player UI<br/>HTML + CSS + player.js"]:::client
+            Audio["HTMLAudioElement"]:::client
+            HlsJs["hls.js 1.6.16<br/>Media Source playback"]:::client
+            NativeHls["Native HLS playback<br/>primarily Safari"]:::client
+            MetadataPoller["Metadata poller<br/>5-second interval while visible"]:::client
+            QualityDetector["Quality detector<br/>LEVEL_LOADED + BUFFER_CODECS"]:::client
+            RatingClient["Rating controls<br/>signed voter cookie"]:::client
+
+            Browser --> UI
+            UI --> Audio
+            UI --> MetadataPoller
+            UI --> RatingClient
+            Audio -->|"Chromium and compatible MSE browsers"| HlsJs
+            Audio -->|"Native HLS-capable non-Chromium browsers"| NativeHls
+            HlsJs --> QualityDetector
+        end
+
+        subgraph Edge["Container: nginx:1.27-alpine"]
+            direction TB
+            Nginx["Nginx reverse proxy<br/>port 5001 → port 80"]:::edge
+            Limits["Request and connection limits<br/>gzip + security headers"]:::edge
+            StaticProxy["/static/* proxy<br/>1-hour public cache"]:::edge
+            ApiProxy["/ and application routes"]:::edge
+            RateLimit["/rate<br/>ratings rate limit"]:::edge
+            UploadLimit["/tracks POST<br/>upload rate limit"]:::edge
+
+            Nginx --> Limits
+            Limits --> StaticProxy
+            Limits --> ApiProxy
+            Limits --> RateLimit
+            Limits --> UploadLimit
+        end
+
+        subgraph Application["Container: radioclaude-prod"]
+            direction TB
+            Startup["start-prod.sh<br/>load or create secret key<br/>initialize schema"]:::app
+            Gunicorn["Gunicorn<br/>4 workers by default<br/>port 5000"]:::app
+            Flask["Flask application"]:::app
+            Index["GET /<br/>render index.html with external URLs"]:::app
+            Static["Flask static assets<br/>CSS, JS, images"]:::app
+            Ratings["GET /rate-status<br/>POST /rate"]:::app
+            Tracks["GET/POST /tracks<br/>DELETE /tracks/:id"]:::app
+            LocalAudio["GET /audio/:filename"]:::app
+            Health["GET /health<br/>database readiness check"]:::app
+            CSP["Response security policy<br/>CSP derived from configured origins"]:::app
+
+            Startup --> Gunicorn
+            Gunicorn --> Flask
+            Flask --> Index
+            Flask --> Static
+            Flask --> Ratings
+            Flask --> Tracks
+            Flask --> LocalAudio
+            Flask --> Health
+            Flask --> CSP
+        end
+
+        subgraph Persistence["Persistent state"]
+            direction LR
+            Postgres["Container: PostgreSQL 17<br/>tracks + ratings"]:::data
+            PostgresVolume[("postgres_data")]:::data
+            UploadVolume[("uploads_data<br/>uploaded audio files")]:::data
+            SecretVolume[("app_secrets<br/>generated signing key")]:::data
+
+            Postgres --- PostgresVolume
+        end
+
+        Browser -->|"HTTP(S)"| Nginx
+        StaticProxy --> Static
+        ApiProxy --> Flask
+        RateLimit --> Ratings
+        UploadLimit --> Tracks
+        Ratings --> Postgres
+        Tracks --> Postgres
+        Tracks --> UploadVolume
+        LocalAudio --> UploadVolume
+        Health --> Postgres
+        Startup --> SecretVolume
+    end
+
+    subgraph Media["Operator-configured external services"]
+        direction TB
+        PrimaryHls["STREAM_URL<br/>primary HLS stream"]:::external
+        FallbackHls["HLS_FALLBACK_URL<br/>browser-compatible HLS rendition"]:::external
+        Metadata["METADATA_URL<br/>current and previous track JSON"]:::external
+        Cover["COVER_URL<br/>mutable current artwork"]:::external
+        JsDelivr["jsDelivr CDN<br/>hls.js loaded on demand"]:::external
+        Fonts["Google Fonts"]:::external
+    end
+
+    Index -. "injects configured URLs as data attributes" .-> UI
+    HlsJs -->|"HLS segments"| FallbackHls
+    HlsJs -. "loads library when playback starts" .-> JsDelivr
+    NativeHls -->|"HLS segments"| PrimaryHls
+    MetadataPoller -->|"fetch, cache: no-store"| Metadata
+    MetadataPoller -->|"artwork request with track and timestamp cache key"| Cover
+    UI -. "font assets" .-> Fonts
+    RatingClient -->|"GET status / POST vote"| Nginx
+
+    subgraph Configuration["Runtime configuration"]
+        direction LR
+        Env["Environment variables<br/>STREAM_URL<br/>HLS_FALLBACK_URL<br/>METADATA_URL<br/>COVER_URL<br/>DATABASE_URL<br/>SECRET_KEY"]:::delivery
+        Compose["docker-compose.yml<br/>service wiring, health checks, volumes"]:::delivery
+        Env --> Application
+        Compose --> Runtime
+    end
+
+    subgraph Delivery["Source control, CI, and image delivery"]
+        direction LR
+        Developer["Developer branch / pull request"]:::delivery
+        GitHub["GitHub repository<br/>main branch"]:::delivery
+        Tests["GitHub Actions tests<br/>pytest + infrastructure security checks"]:::delivery
+        Build["Multi-stage Docker build<br/>prod target<br/>linux/amd64 + linux/arm64"]:::delivery
+        GHCR["GitHub Container Registry<br/>latest<br/>sha-&lt;full-git-sha&gt;"]:::delivery
+        Deploy["Deployment host<br/>docker pull + compose up --no-build"]:::delivery
+
+        Developer --> GitHub
+        GitHub --> Tests
+        Tests -->|"pass"| Build
+        Build --> GHCR
+        GHCR --> Deploy
+        Deploy --> Application
+    end
+
+    subgraph Development["Local development path"]
+        direction LR
+        DevCompose["radioclaude-dev<br/>Flask debug server<br/>bind-mounted source"]:::delivery
+        SQLite[("data/app.db<br/>SQLite fallback")]:::data
+        LocalUploads[("local uploads/")]:::data
+
+        DevCompose --> SQLite
+        DevCompose --> LocalUploads
+    end
