@@ -30,6 +30,7 @@ Install dev dependencies and run the backend test suite:
 source .venv/bin/activate
 python3 -m pip install -r requirements-dev.txt
 python3 -m pytest
+./tests/infrastructure/security_checks.sh
 ```
 
 There is no frontend test suite, lint config, or formatter configured. Frontend testing was scoped (Playwright e2e against mocked HLS/metadata endpoints) but deliberately skipped — not worth the added toolchain for this project's size.

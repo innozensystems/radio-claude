@@ -100,6 +100,19 @@ python3 -m pip install -r requirements-dev.txt
 python3 -m pytest
 ```
 
+Security-sensitive Flask behavior is covered by focused regression tests in
+`tests/backend/test_security.py` and runs as part of pytest.
+
+Docker, Compose, and Nginx security invariants are checked separately:
+
+```bash
+./tests/infrastructure/security_checks.sh
+```
+
+The infrastructure script validates the Compose model, non-root production
+image configuration, local-only development port, internal-only application
+and database services, Nginx limits, and upload-size configuration.
+
 There's no frontend test suite — it was scoped (Playwright e2e against mocked HLS/metadata endpoints) but skipped as not worth the added toolchain for this project's size.
 
 ## Project structure
